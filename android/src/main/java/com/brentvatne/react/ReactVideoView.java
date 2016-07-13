@@ -6,11 +6,8 @@ import android.os.Handler;
 import android.util.Log;
 import android.webkit.CookieManager;
 
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.LifecycleEventListener;
-import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.ThemedReactContext;
-import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.yqritc.scalablevideoview.ScalableType;
 import com.yqritc.scalablevideoview.ScalableVideoView;
 
@@ -20,51 +17,8 @@ import java.util.Map;
 public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnPreparedListener, MediaPlayer
         .OnErrorListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnInfoListener, LifecycleEventListener {
 
-    public enum Events {
-        EVENT_LOAD_START("onVideoLoadStart"),
-        EVENT_LOAD("onVideoLoad"),
-        EVENT_ERROR("onVideoError"),
-        EVENT_PROGRESS("onVideoProgress"),
-        EVENT_SEEK("onVideoSeek"),
-        EVENT_END("onVideoEnd"),
-        EVENT_STALLED("onPlaybackStalled"),
-        EVENT_RESUME("onPlaybackResume"),
-        EVENT_READY_FOR_DISPLAY("onReadyForDisplay");
-
-        private final String mName;
-
-        Events(final String name) {
-            mName = name;
-        }
-
-        @Override
-        public String toString() {
-            return mName;
-        }
-    }
-
-    public static final String EVENT_PROP_FAST_FORWARD = "canPlayFastForward";
-    public static final String EVENT_PROP_SLOW_FORWARD = "canPlaySlowForward";
-    public static final String EVENT_PROP_SLOW_REVERSE = "canPlaySlowReverse";
-    public static final String EVENT_PROP_REVERSE = "canPlayReverse";
-    public static final String EVENT_PROP_STEP_FORWARD = "canStepForward";
-    public static final String EVENT_PROP_STEP_BACKWARD = "canStepBackward";
-
-    public static final String EVENT_PROP_DURATION = "duration";
-    public static final String EVENT_PROP_PLAYABLE_DURATION = "playableDuration";
-    public static final String EVENT_PROP_CURRENT_TIME = "currentTime";
-    public static final String EVENT_PROP_SEEK_TIME = "seekTime";
-    public static final String EVENT_PROP_NATURALSIZE = "naturalSize";
-    public static final String EVENT_PROP_WIDTH = "width";
-    public static final String EVENT_PROP_HEIGHT = "height";
-    public static final String EVENT_PROP_ORIENTATION = "orientation";
-
-    public static final String EVENT_PROP_ERROR = "error";
-    public static final String EVENT_PROP_WHAT = "what";
-    public static final String EVENT_PROP_EXTRA = "extra";
-
     private ThemedReactContext mThemedReactContext;
-    private RCTEventEmitter mEventEmitter;
+    private ReactVideoEventDispatcher mEventDispatcher;
 
     private Handler mProgressUpdateHandler = new Handler();
     private Runnable mProgressUpdateRunnable = null;
@@ -90,26 +44,30 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         super(themedReactContext);
 
         mThemedReactContext = themedReactContext;
-        mEventEmitter = themedReactContext.getJSModule(RCTEventEmitter.class);
+        mEventDispatcher = new ReactVideoEventDispatcher(this, themedReactContext);
         themedReactContext.addLifecycleEventListener(this);
 
         initializeMediaPlayerIfNeeded();
         setSurfaceTextureListener(this);
 
         mProgressUpdateRunnable = new Runnable() {
+            private float mLastReportedPosition = Float.NaN;
+            private float mLastReportedDuration = Float.NaN;
+
             @Override
             public void run() {
-
                 if (mMediaPlayerValid && !isCompleted) {
-                    WritableMap event = Arguments.createMap();
-                    event.putDouble(EVENT_PROP_CURRENT_TIME, mMediaPlayer.getCurrentPosition() / 1000.0);
-                    event.putDouble(EVENT_PROP_PLAYABLE_DURATION, mVideoBufferedDuration / 1000.0); //TODO:mBufferUpdateRunnable
-                    mEventEmitter.receiveEvent(getId(), Events.EVENT_PROGRESS.toString(), event);
+                    float position = mMediaPlayer.getCurrentPosition() / 1000.0f;
+                    float duration = mVideoBufferedDuration / 1000.0f;
+                    if (mLastReportedPosition != position || mLastReportedDuration != duration) {
+                        mLastReportedPosition = position;
+                        mLastReportedDuration = duration;
+                        mEventDispatcher.dispatchProgressEvent(position, duration);
+                    }
+                    mProgressUpdateHandler.postDelayed(mProgressUpdateRunnable, 250);
                 }
-                mProgressUpdateHandler.postDelayed(mProgressUpdateRunnable, 250);
             }
         };
-        mProgressUpdateHandler.post(mProgressUpdateRunnable);
     }
 
     private void initializeMediaPlayerIfNeeded() {
@@ -127,8 +85,12 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         }
     }
 
-    public void setSrc(final String uriString, final String type, final boolean isNetwork, final boolean isAsset) {
+    private void startReportingProgress() {
+        mProgressUpdateHandler.removeCallbacks(mProgressUpdateRunnable);
+        mProgressUpdateHandler.post(mProgressUpdateRunnable);
+    }
 
+    public void setSrc(final String uriString, final String type, final boolean isNetwork, final boolean isAsset) {
         mSrcUriString = uriString;
         mSrcType = type;
         mSrcIsNetwork = isNetwork;
@@ -178,13 +140,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
             return;
         }
 
-        WritableMap src = Arguments.createMap();
-        src.putString(ReactVideoViewManager.PROP_SRC_URI, uriString);
-        src.putString(ReactVideoViewManager.PROP_SRC_TYPE, type);
-        src.putBoolean(ReactVideoViewManager.PROP_SRC_IS_NETWORK, isNetwork);
-        WritableMap event = Arguments.createMap();
-        event.putMap(ReactVideoViewManager.PROP_SRC, src);
-        mEventEmitter.receiveEvent(getId(), Events.EVENT_LOAD_START.toString(), event);
+        mEventDispatcher.dispatchLoadStartEvent(uriString, type, isNetwork);
 
         prepareAsync(this);
     }
@@ -199,7 +155,6 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     public void setRepeatModifier(final boolean repeat) {
-
         mRepeat = repeat;
 
         if (mMediaPlayerValid) {
@@ -208,7 +163,6 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     public void setPausedModifier(final boolean paused) {
-
         mPaused = paused;
 
         if (!mMediaPlayerValid) {
@@ -263,50 +217,27 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     public void setPlayInBackground(final boolean playInBackground) {
-
         mPlayInBackground = playInBackground;
     }
 
     @Override
     public void onPrepared(MediaPlayer mp) {
-
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
-        WritableMap naturalSize = Arguments.createMap();
-        naturalSize.putInt(EVENT_PROP_WIDTH, mp.getVideoWidth());
-        naturalSize.putInt(EVENT_PROP_HEIGHT, mp.getVideoHeight());
-        if (mp.getVideoWidth() > mp.getVideoHeight())
-            naturalSize.putString(EVENT_PROP_ORIENTATION, "landscape");
-        else
-            naturalSize.putString(EVENT_PROP_ORIENTATION, "portrait");
-
-        WritableMap event = Arguments.createMap();
-        event.putDouble(EVENT_PROP_DURATION, mVideoDuration / 1000.0);
-        event.putDouble(EVENT_PROP_CURRENT_TIME, mp.getCurrentPosition() / 1000.0);
-        event.putMap(EVENT_PROP_NATURALSIZE, naturalSize);
-        // TODO: Actually check if you can.
-        event.putBoolean(EVENT_PROP_FAST_FORWARD, true);
-        event.putBoolean(EVENT_PROP_SLOW_FORWARD, true);
-        event.putBoolean(EVENT_PROP_SLOW_REVERSE, true);
-        event.putBoolean(EVENT_PROP_REVERSE, true);
-        event.putBoolean(EVENT_PROP_FAST_FORWARD, true);
-        event.putBoolean(EVENT_PROP_STEP_BACKWARD, true);
-        event.putBoolean(EVENT_PROP_STEP_FORWARD, true);
-        mEventEmitter.receiveEvent(getId(), Events.EVENT_LOAD.toString(), event);
+        mEventDispatcher.dispatchLoadEvent(
+                mVideoDuration / 1000.0f,
+                mp.getCurrentPosition() / 1000.0f,
+                mp.getVideoWidth(),
+                mp.getVideoHeight());
 
         applyModifiers();
+        startReportingProgress();
     }
 
     @Override
     public boolean onError(MediaPlayer mp, int what, int extra) {
-
-        WritableMap error = Arguments.createMap();
-        error.putInt(EVENT_PROP_WHAT, what);
-        error.putInt(EVENT_PROP_EXTRA, extra);
-        WritableMap event = Arguments.createMap();
-        event.putMap(EVENT_PROP_ERROR, error);
-        mEventEmitter.receiveEvent(getId(), Events.EVENT_ERROR.toString(), event);
+        mEventDispatcher.dispatchErrorEvent(what, extra);
         return true;
     }
 
@@ -314,13 +245,13 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     public boolean onInfo(MediaPlayer mp, int what, int extra) {
         switch (what) {
             case MediaPlayer.MEDIA_INFO_BUFFERING_START:
-                mEventEmitter.receiveEvent(getId(), Events.EVENT_STALLED.toString(), Arguments.createMap());
+                mEventDispatcher.dispatchStalledEvent();
                 break;
             case MediaPlayer.MEDIA_INFO_BUFFERING_END:
-                mEventEmitter.receiveEvent(getId(), Events.EVENT_RESUME.toString(), Arguments.createMap());
+                mEventDispatcher.dispatchResumeEvent();
                 break;
             case MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START:
-                mEventEmitter.receiveEvent(getId(), Events.EVENT_READY_FOR_DISPLAY.toString(), Arguments.createMap());
+                mEventDispatcher.dispatchReadyForDisplayEvent();
                 break;
 
             default:
@@ -337,42 +268,36 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     public void seekTo(int msec) {
 
         if (mMediaPlayerValid) {
-            WritableMap event = Arguments.createMap();
-            event.putDouble(EVENT_PROP_CURRENT_TIME, getCurrentPosition() / 1000.0);
-            event.putDouble(EVENT_PROP_SEEK_TIME, msec / 1000.0);
-            mEventEmitter.receiveEvent(getId(), Events.EVENT_SEEK.toString(), event);
+            mEventDispatcher.dispatchSeekEvent(getCurrentPosition() / 1000.0f, msec / 1000.0f);
 
             super.seekTo(msec);
             if (isCompleted && mVideoDuration != 0 && msec < mVideoDuration) {
                 isCompleted = false;
+                startReportingProgress();
             }
         }
     }
 
     @Override
     public void onCompletion(MediaPlayer mp) {
-
         isCompleted = true;
-        mEventEmitter.receiveEvent(getId(), Events.EVENT_END.toString(), null);
+        mEventDispatcher.dispatchEndEvent();
     }
 
     @Override
     protected void onDetachedFromWindow() {
-
         mMediaPlayerValid = false;
         super.onDetachedFromWindow();
     }
 
     @Override
     protected void onAttachedToWindow() {
-
         super.onAttachedToWindow();
         setSrc(mSrcUriString, mSrcType, mSrcIsNetwork, mSrcIsAsset);
     }
 
     @Override
     public void onHostPause() {
-
         if (mMediaPlayer != null && !mPlayInBackground) {
             mMediaPlayer.pause();
         }

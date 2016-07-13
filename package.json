@@ -13,6 +13,7 @@
     "android/src/main/java/com/brentvatne/react/ReactVideoPackage.java",
     "android/src/main/java/com/brentvatne/react/ReactVideoViewManager.java",
     "android/src/main/java/com/brentvatne/react/ReactVideoView.java",
+    "android/src/main/java/com/brentvatne/react/ReactVideoEventDispatcher.java",
     "RCTVideo.xcodeproj",
     "RCTVideo.h",
     "RCTVideo.m",
