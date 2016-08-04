@@ -223,11 +223,11 @@ public class ReactVideoEventDispatcher {
 
     @Override
     public void dispatch(RCTEventEmitter rctEventEmitter) {
+      WritableMap error = Arguments.createMap();
+      error.putInt(EVENT_PROP_WHAT, mWhat);
+      error.putInt(EVENT_PROP_EXTRA, mExtra);
       WritableMap eventData = Arguments.createMap();
-      eventData.putInt(EVENT_PROP_WHAT, mWhat);
-      eventData.putInt(EVENT_PROP_EXTRA, mExtra);
-      WritableMap event = Arguments.createMap();
-      event.putMap(EVENT_PROP_ERROR, eventData);
+      eventData.putMap(EVENT_PROP_ERROR, error);
       rctEventEmitter.receiveEvent(getViewTag(), getEventName(), eventData);
     }
   }
