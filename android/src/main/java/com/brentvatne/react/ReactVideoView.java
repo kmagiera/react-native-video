@@ -14,8 +14,9 @@ import com.yqritc.scalablevideoview.ScalableVideoView;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnPreparedListener, MediaPlayer
-        .OnErrorListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnInfoListener, LifecycleEventListener {
+public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnPreparedListener,
+        MediaPlayer.OnErrorListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnCompletionListener,
+        MediaPlayer.OnInfoListener, MediaPlayer.OnSeekCompleteListener, LifecycleEventListener {
 
     private ThemedReactContext mThemedReactContext;
     private ReactVideoEventDispatcher mEventDispatcher;
@@ -38,7 +39,9 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private boolean mMediaPlayerValid = false; // True if mMediaPlayer is in prepared, started, paused or completed state.
     private int mVideoDuration = 0;
     private int mVideoBufferedDuration = 0;
-    private boolean isCompleted = false;
+
+    private float mLastReportedPosition = Float.NaN;
+    private float mLastReportedDuration = Float.NaN;
 
     public ReactVideoView(ThemedReactContext themedReactContext) {
         super(themedReactContext);
@@ -51,20 +54,13 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         setSurfaceTextureListener(this);
 
         mProgressUpdateRunnable = new Runnable() {
-            private float mLastReportedPosition = Float.NaN;
-            private float mLastReportedDuration = Float.NaN;
-
             @Override
             public void run() {
-                if (mMediaPlayerValid && !isCompleted) {
-                    float position = mMediaPlayer.getCurrentPosition() / 1000.0f;
-                    float duration = mVideoBufferedDuration / 1000.0f;
-                    if (mLastReportedPosition != position || mLastReportedDuration != duration) {
-                        mLastReportedPosition = position;
-                        mLastReportedDuration = duration;
-                        mEventDispatcher.dispatchProgressEvent(position, duration);
+                if (mMediaPlayerValid) {
+                    sendProgressEvent();
+                    if (mMediaPlayer.isPlaying()) {
+                        mProgressUpdateHandler.postDelayed(mProgressUpdateRunnable, 250);
                     }
-                    mProgressUpdateHandler.postDelayed(mProgressUpdateRunnable, 250);
                 }
             }
         };
@@ -81,13 +77,23 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
             mMediaPlayer.setOnBufferingUpdateListener(this);
             mMediaPlayer.setOnCompletionListener(this);
             mMediaPlayer.setOnInfoListener(this);
-
+            mMediaPlayer.setOnSeekCompleteListener(this);
         }
     }
 
     private void startReportingProgress() {
         mProgressUpdateHandler.removeCallbacks(mProgressUpdateRunnable);
         mProgressUpdateHandler.post(mProgressUpdateRunnable);
+    }
+
+    private void sendProgressEvent() {
+        float position = mMediaPlayer.getCurrentPosition() / 1000.0f;
+        float duration = mVideoBufferedDuration / 1000.0f;
+        if (mLastReportedPosition != position || mLastReportedDuration != duration) {
+            mLastReportedPosition = position;
+            mLastReportedDuration = duration;
+            mEventDispatcher.dispatchProgressEvent(position, duration);
+        }
     }
 
     public void setSrc(final String uriString, final String type, final boolean isNetwork, final boolean isAsset) {
@@ -178,6 +184,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
                 start();
             }
         }
+        startReportingProgress();
     }
 
     public void setMutedModifier(final boolean muted) {
@@ -266,21 +273,21 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void seekTo(int msec) {
-
         if (mMediaPlayerValid) {
             mEventDispatcher.dispatchSeekEvent(getCurrentPosition() / 1000.0f, msec / 1000.0f);
 
             super.seekTo(msec);
-            if (isCompleted && mVideoDuration != 0 && msec < mVideoDuration) {
-                isCompleted = false;
-                startReportingProgress();
-            }
+            startReportingProgress();
         }
     }
 
     @Override
+    public void onSeekComplete(MediaPlayer mp) {
+        startReportingProgress();
+    }
+
+    @Override
     public void onCompletion(MediaPlayer mp) {
-        isCompleted = true;
         mEventDispatcher.dispatchEndEvent();
     }
 
