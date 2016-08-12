@@ -3,7 +3,6 @@ package com.brentvatne.react;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.WritableMap;
-import com.facebook.react.common.SystemClock;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.events.Event;
 import com.facebook.react.uimanager.events.EventDispatcher;
@@ -58,8 +57,8 @@ public class ReactVideoEventDispatcher {
     private final float mCurrentTime;
     private final float mPlayableDuration;
 
-    public ProgressEvent(int viewId, long timestampMs, float currentTime, float playableDuration) {
-      super(viewId, timestampMs);
+    public ProgressEvent(int viewId, float currentTime, float playableDuration) {
+      super(viewId);
       mCurrentTime = currentTime;
       mPlayableDuration = playableDuration;
     }
@@ -92,8 +91,8 @@ public class ReactVideoEventDispatcher {
 
     private final String mEventName;
 
-    public StateEvent(int viewId, long timestampMs, String eventName) {
-      super(viewId, timestampMs);
+    public StateEvent(int viewId, String eventName) {
+      super(viewId);
       mEventName = eventName;
     }
 
@@ -119,8 +118,8 @@ public class ReactVideoEventDispatcher {
     private final String mSrcType;
     private final boolean mIsNetwork;
 
-    public LoadStartEvent(int viewId, long timestampMs, String uri, String srcType, boolean isNetwork) {
-      super(viewId, timestampMs);
+    public LoadStartEvent(int viewId, String uri, String srcType, boolean isNetwork) {
+      super(viewId);
       mUri = uri;
       mSrcType = srcType;
       mIsNetwork = isNetwork;
@@ -155,8 +154,8 @@ public class ReactVideoEventDispatcher {
     private final int mWidth;
     private final int mHeight;
 
-    public LoadEvent(int viewId, long timestampMs, float duration, float currentTime, int width, int height) {
-      super(viewId, timestampMs);
+    public LoadEvent(int viewId, float duration, float currentTime, int width, int height) {
+      super(viewId);
       mDuration = duration;
       mCurrentTime = currentTime;
       mWidth = width;
@@ -205,8 +204,8 @@ public class ReactVideoEventDispatcher {
     private final int mWhat;
     private final int mExtra;
 
-    public ErrorEvent(int viewId, long timestampMs, int what, int extra) {
-      super(viewId, timestampMs);
+    public ErrorEvent(int viewId, int what, int extra) {
+      super(viewId);
       mWhat = what;
       mExtra = extra;
     }
@@ -237,8 +236,8 @@ public class ReactVideoEventDispatcher {
     private final float mCurrentTime;
     private final float mSeekTime;
 
-    public SeekEvent(int viewId, long timestampMs, float currentTime, float seekTime) {
-      super(viewId, timestampMs);
+    public SeekEvent(int viewId, float currentTime, float seekTime) {
+      super(viewId);
       mCurrentTime = currentTime;
       mSeekTime = seekTime;
     }
@@ -273,46 +272,46 @@ public class ReactVideoEventDispatcher {
 
   public void dispatchProgressEvent(float currentPosition, float playableDuration) {
     mEventDispatcher.dispatchEvent(
-            new ProgressEvent(mView.getId(), SystemClock.nanoTime(), currentPosition, playableDuration));
+            new ProgressEvent(mView.getId(), currentPosition, playableDuration));
   }
 
   public void dispatchEndEvent() {
     mEventDispatcher.dispatchEvent(
-            new StateEvent(mView.getId(), SystemClock.nanoTime(), EVENT_END));
+            new StateEvent(mView.getId(), EVENT_END));
   }
 
   public void dispatchStalledEvent() {
     mEventDispatcher.dispatchEvent(
-            new StateEvent(mView.getId(), SystemClock.nanoTime(), EVENT_STALLED));
+            new StateEvent(mView.getId(), EVENT_STALLED));
   }
 
   public void dispatchResumeEvent() {
     mEventDispatcher.dispatchEvent(
-            new StateEvent(mView.getId(), SystemClock.nanoTime(), EVENT_RESUME));
+            new StateEvent(mView.getId(), EVENT_RESUME));
   }
 
   public void dispatchReadyForDisplayEvent() {
     mEventDispatcher.dispatchEvent(
-            new StateEvent(mView.getId(), SystemClock.nanoTime(), EVENT_READY_FOR_DISPLAY));
+            new StateEvent(mView.getId(), EVENT_READY_FOR_DISPLAY));
   }
 
   public void dispatchLoadStartEvent(String uri, String srcType, boolean isNetwork) {
     mEventDispatcher.dispatchEvent(
-            new LoadStartEvent(mView.getId(), SystemClock.nanoTime(), uri, srcType, isNetwork));
+            new LoadStartEvent(mView.getId(), uri, srcType, isNetwork));
   }
 
   public void dispatchLoadEvent(float duration, float currentTime, int width, int height) {
     mEventDispatcher.dispatchEvent(
-            new LoadEvent(mView.getId(), SystemClock.nanoTime(), duration, currentTime, width, height));
+            new LoadEvent(mView.getId(), duration, currentTime, width, height));
   }
 
   public void dispatchErrorEvent(int what, int extra) {
     mEventDispatcher.dispatchEvent(
-            new ErrorEvent(mView.getId(), SystemClock.nanoTime(), what, extra));
+            new ErrorEvent(mView.getId(), what, extra));
   }
 
   public void dispatchSeekEvent(float currentTime, float seekTime) {
     mEventDispatcher.dispatchEvent(
-            new SeekEvent(mView.getId(), SystemClock.nanoTime(), currentTime, seekTime));
+            new SeekEvent(mView.getId(), currentTime, seekTime));
   }
 }
