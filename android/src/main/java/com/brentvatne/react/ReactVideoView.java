@@ -1,12 +1,16 @@
 package com.brentvatne.react;
 
+import android.content.Context;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.util.Log;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 
 import com.facebook.react.bridge.LifecycleEventListener;
+import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.yqritc.scalablevideoview.ScalableType;
 import com.yqritc.scalablevideoview.ScalableVideoView;
@@ -43,9 +47,12 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private float mLastReportedPosition = Float.NaN;
     private float mLastReportedDuration = Float.NaN;
 
-    public ReactVideoView(ThemedReactContext themedReactContext) {
+    private final ReactApplicationContext mAppContext;
+
+    public ReactVideoView(ThemedReactContext themedReactContext, ReactApplicationContext appCtx) {
         super(themedReactContext);
 
+        mAppContext = appCtx;
         mThemedReactContext = themedReactContext;
         mEventDispatcher = new ReactVideoEventDispatcher(this, themedReactContext);
         themedReactContext.addLifecycleEventListener(this);
@@ -149,6 +156,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         mEventDispatcher.dispatchLoadStartEvent(uriString, type, isNetwork);
 
         prepareAsync(this);
+
     }
 
     public void setResizeModeModifier(final ScalableType resizeMode) {
@@ -178,10 +186,12 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         if (mPaused) {
             if (mMediaPlayer.isPlaying()) {
                 pause();
+                setWakeLock(false);
             }
         } else {
             if (!mMediaPlayer.isPlaying()) {
                 start();
+                setWakeLock(true);
             }
         }
         startReportingProgress();
@@ -231,6 +241,8 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     public void onPrepared(MediaPlayer mp) {
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
+
+        setWakeLock(true);
 
         mEventDispatcher.dispatchLoadEvent(
                 mVideoDuration / 1000.0f,
@@ -288,7 +300,18 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void onCompletion(MediaPlayer mp) {
+        setWakeLock(false);
         mEventDispatcher.dispatchEndEvent();
+    }
+
+    private void setWakeLock(boolean wakeLockEnabled) {
+        if (mAppContext.getCurrentActivity() != null && mAppContext.getCurrentActivity().getWindow() != null) {
+            if (wakeLockEnabled) {
+                mAppContext.getCurrentActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            } else {
+                mAppContext.getCurrentActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+        }
     }
 
     @Override

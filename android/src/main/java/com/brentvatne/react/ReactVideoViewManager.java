@@ -1,5 +1,6 @@
 package com.brentvatne.react;
 
+import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
@@ -29,6 +30,12 @@ public class ReactVideoViewManager extends SimpleViewManager<ReactVideoView> {
     public static final String PROP_RATE = "rate";
     public static final String PROP_PLAY_IN_BACKGROUND = "playInBackground";
 
+    private final ReactApplicationContext mAppContext;
+
+    ReactVideoViewManager(ReactApplicationContext appCtx) {
+        mAppContext = appCtx;
+    }
+
     @Override
     public String getName() {
         return REACT_CLASS;
@@ -36,7 +43,7 @@ public class ReactVideoViewManager extends SimpleViewManager<ReactVideoView> {
 
     @Override
     protected ReactVideoView createViewInstance(ThemedReactContext themedReactContext) {
-        return new ReactVideoView(themedReactContext);
+        return new ReactVideoView(themedReactContext, mAppContext);
     }
 
     @Override
