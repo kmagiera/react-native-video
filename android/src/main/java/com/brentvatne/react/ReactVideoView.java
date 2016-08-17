@@ -65,7 +65,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
             public void run() {
                 if (mMediaPlayerValid) {
                     sendProgressEvent();
-                    if (mMediaPlayer.isPlaying()) {
+                    if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
                         mProgressUpdateHandler.postDelayed(mProgressUpdateRunnable, 250);
                     }
                 }
@@ -239,6 +239,9 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void onPrepared(MediaPlayer mp) {
+        if (mMediaPlayer == null) {
+            return;
+       }
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
@@ -339,5 +342,10 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void onHostDestroy() {
+    }
+
+    public void drop() {
+        mMediaPlayer.release();
+        mMediaPlayer = null;
     }
 }

@@ -57,6 +57,12 @@ public class ReactVideoViewManager extends SimpleViewManager<ReactVideoView> {
     }
 
     @Override
+    public void onDropViewInstance(ReactVideoView view) {
+      super.onDropViewInstance(view);
+      view.drop();
+    }
+
+    @Override
     @Nullable
     public Map getExportedViewConstants() {
         return MapBuilder.of(
