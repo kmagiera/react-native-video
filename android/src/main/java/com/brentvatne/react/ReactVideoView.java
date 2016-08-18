@@ -47,6 +47,8 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private float mLastReportedPosition = Float.NaN;
     private float mLastReportedDuration = Float.NaN;
 
+    private boolean mStopped = false;
+
     private final ReactApplicationContext mAppContext;
 
     public ReactVideoView(ThemedReactContext themedReactContext, ReactApplicationContext appCtx) {
@@ -100,6 +102,10 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
             mLastReportedPosition = position;
             mLastReportedDuration = duration;
             mEventDispatcher.dispatchProgressEvent(position, duration);
+        }
+        if (mStopped) {
+            mMediaPlayer.release();
+            mMediaPlayer = null;
         }
     }
 
@@ -239,9 +245,11 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     public void onPrepared(MediaPlayer mp) {
-        if (mMediaPlayer == null) {
+        if (mStopped) {
+            mMediaPlayer.release();
+            mMediaPlayer = null;
             return;
-       }
+        }
         mMediaPlayerValid = true;
         mVideoDuration = mp.getDuration();
 
@@ -345,9 +353,6 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     }
 
     public void drop() {
-        if (mMediaPlayer != null) {
-          mMediaPlayer.release();
-        }
-        mMediaPlayer = null;
+        mStopped = true;
     }
 }
