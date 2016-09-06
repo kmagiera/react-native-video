@@ -22,6 +22,8 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
         MediaPlayer.OnErrorListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnCompletionListener,
         MediaPlayer.OnInfoListener, MediaPlayer.OnSeekCompleteListener, LifecycleEventListener {
 
+    private static int sWakelockSemaphore = 0;
+
     private ThemedReactContext mThemedReactContext;
     private ReactVideoEventDispatcher mEventDispatcher;
 
@@ -48,6 +50,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
     private float mLastReportedDuration = Float.NaN;
 
     private boolean mStopped = false;
+    private boolean mHasSetWakelock = false;
 
     private final ReactApplicationContext mAppContext;
 
@@ -317,9 +320,17 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     private void setWakeLock(boolean wakeLockEnabled) {
         if (mAppContext.getCurrentActivity() != null && mAppContext.getCurrentActivity().getWindow() != null) {
-            if (wakeLockEnabled) {
+            if (wakeLockEnabled && !mHasSetWakelock) {
+                mHasSetWakelock = true;
+                sWakelockSemaphore++;
+
+            } else if (!wakeLockEnabled && mHasSetWakelock) {
+                mHasSetWakelock = false;
+                sWakelockSemaphore--;
+            }
+            if (sWakelockSemaphore == 1) {
                 mAppContext.getCurrentActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            } else {
+            } else if (sWakelockSemaphore == 0) {
                 mAppContext.getCurrentActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             }
         }
@@ -327,6 +338,7 @@ public class ReactVideoView extends ScalableVideoView implements MediaPlayer.OnP
 
     @Override
     protected void onDetachedFromWindow() {
+        setWakeLock(false);
         mMediaPlayerValid = false;
         super.onDetachedFromWindow();
     }
